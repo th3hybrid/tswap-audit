@@ -93,6 +93,7 @@ contract TSwapPool is ERC20 {
         string memory liquidityTokenName,
         string memory liquidityTokenSymbol
     ) ERC20(liquidityTokenName, liquidityTokenSymbol) {
+        //@audit-info -lacking zero address check
         i_wethToken = IERC20(wethToken);
         i_poolToken = IERC20(poolToken);
     }
@@ -114,6 +115,9 @@ contract TSwapPool is ERC20 {
         uint256 wethToDeposit,
         uint256 minimumLiquidityTokensToMint,
         uint256 maximumPoolTokensToDeposit,
+        //@audit deadline is not being used
+        //IMPACT:High
+        //Likelihood:High
         uint64 deadline
     )
         external
@@ -121,6 +125,7 @@ contract TSwapPool is ERC20 {
         returns (uint256 liquidityTokensToMint)
     {
         if (wethToDeposit < MINIMUM_WETH_LIQUIDITY) {
+            //@audit-info MINIMUM_WETH_LIQUIDITY is a constant,not required to be emitted
             revert TSwapPool__WethDepositAmountTooLow(
                 MINIMUM_WETH_LIQUIDITY,
                 wethToDeposit
@@ -128,6 +133,7 @@ contract TSwapPool is ERC20 {
         }
         if (totalLiquidityTokenSupply() > 0) {
             uint256 wethReserves = i_wethToken.balanceOf(address(this));
+            //@audit-info line not used
             uint256 poolTokenReserves = i_poolToken.balanceOf(address(this));
             // Our invariant says weth, poolTokens, and liquidity tokens must always have the same ratio after the
             // initial deposit
@@ -149,6 +155,7 @@ contract TSwapPool is ERC20 {
             uint256 poolTokensToDeposit = getPoolTokensToDepositBasedOnWeth(
                 wethToDeposit
             );
+            //@audit possible issue?
             if (maximumPoolTokensToDeposit < poolTokensToDeposit) {
                 revert TSwapPool__MaxPoolTokenDepositTooHigh(
                     maximumPoolTokensToDeposit,
@@ -179,6 +186,7 @@ contract TSwapPool is ERC20 {
                 maximumPoolTokensToDeposit,
                 wethToDeposit
             );
+            //audit-info: should follow CEI
             liquidityTokensToMint = wethToDeposit;
         }
     }
@@ -193,11 +201,13 @@ contract TSwapPool is ERC20 {
         uint256 liquidityTokensToMint
     ) private {
         _mint(msg.sender, liquidityTokensToMint);
+        //@audit-low this is backwards
+        //LiquidityAdded(address indexed liquidityProvider,uint256 wethDeposited,uint256 poolTokensDeposited);
         emit LiquidityAdded(msg.sender, poolTokensToDeposit, wethToDeposit);
 
         // Interactions
         i_wethToken.safeTransferFrom(msg.sender, address(this), wethToDeposit);
-        i_poolToken.safeTransferFrom(
+        i_poolToken.safeTransferFrom(  
             msg.sender,
             address(this),
             poolTokensToDeposit
@@ -291,6 +301,7 @@ contract TSwapPool is ERC20 {
         returns (uint256 inputAmount)
     {
         return
+        //@audit-info users are charged way more than they should be,while using swapExactOutput function
             ((inputReserves * outputAmount) * 10000) /
             ((outputReserves - outputAmount) * 997);
     }
@@ -354,6 +365,9 @@ contract TSwapPool is ERC20 {
             outputReserves
         );
 
+        //no slippage protection
+
+
         _swap(inputToken, inputAmount, outputToken, outputAmount);
     }
 
@@ -366,6 +380,7 @@ contract TSwapPool is ERC20 {
         uint256 poolTokenAmount
     ) external returns (uint256 wethAmount) {
         return
+        //@audit wrong
             swapExactOutput(
                 i_poolToken,
                 i_wethToken,
